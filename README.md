@@ -1,202 +1,100 @@
 # Riverside Marathon: cheers in your headphones
 
-[Try the hosted demo on Netlify](https://marathon-datasync-demo.netlify.app/).
+[Try the demo](https://marathon-datasync-demo.netlify.app/) · [Local setup](docs/setup.md) · [API reference](docs/reference.md)
 
-The official app of a fictional city marathon, so everyone can be with their runner the whole way. A runner shares a link. Supporters see where she is, live on the course map, from anywhere, and send her a cheer the moment she needs one: her phone reads it into her headphones as soon as it arrives, "From Mum. Remember that hike in the rain? …" A cheer can also wait at a kilometre further along the course and play when she gets there.
+Supporters follow a runner on a live map and leave cheers along the course. Her phone reads each cheer when she reaches it. The race is fictional; the PubNub calls are real.
 
-PubNub is the whole backend. DataSync stores the runner and every cheer, validates each write against a schema, and decides which fields each person can read and write. Pub/Sub carries small notices ("a cheer was pinned", "she heard it"). Access Manager issues one token per person. The server code is three routes: one hands out those tokens, one makes the headphones voice with ElevenLabs, and one stands in for the organiser's timing mats.
+![Two phone screens show Mum following Maya remotely and Maya hearing her cheer at kilometre 32.05. Mum's map shows Maya's position; Maya's red playback overlay displays Mum's encouragement, with a headphones icon and sound-wave bars beside it.](docs/images/cover-kilometre-32.png)
 
-## What the demo covers
+[Image description](docs/image-descriptions.md#cover-kilometre-32)
 
-| DataSync capability | Where you see it |
-|---|---|
-| One REST write updates every authorised subscriber | Each update from the runner's phone is one `PATCH` on `runner.<slug>`. Every supporter's page holds a token with `read` on that entity's channel and gets the event, so every map moves together. |
-| Stored state, recovered after a refresh | A supporter who loses signal in the crowd reloads and gets the run and every cheer back from `getEntity` and `getEntities`, with "Restored from DataSync". |
-| Field-level permissions | Reading: a cheer's `message` is in the `private` projection. The runner and the cheer's author read through it. Every other supporter reads `__default__`: who left a cheer and where, never the words. Writing: a runner's official distance and time (`officialKm`, `officialSec`) come only from the organiser's timing mats. The runner's phone reads and writes her run through the `phone` projection, which leaves them out, so a phone that records its own finish gets a `403` and nothing is saved. At km 24 the course passes 470 m from the finish: **Under the hood** has **Try to record a finish**. Grants limit writes too: a supporter can't change someone else's cheer or the run (`403`). |
-| Schema validation | A phone that has lost its GPS fix can send `lat: null`. `lat` is a non-nullable number, so DataSync answers `400 DS-0650` and no map jumps. **Under the hood** has **Send an empty GPS fix**, and G sends one during a simulated run. |
+## Try it in two windows
 
-## Set up your keyset
+1. Open the demo, enter a name and choose **Simulate race day**.
+2. Open its supporter link in another window, then press **Start** on the runner's page.
+3. Send a cheer now or pin one ahead. Under **Under the hood**, skip ahead 5 km, send an empty GPS fix, or try to record a finish.
 
-For local setup, use your own PubNub account and keyset. The hosted team demo gets scoped tokens from the shared Access Manager, as described in [Deploy on Netlify](#deploy-on-netlify).
+## What runs where
 
-Use Node.js 22 or newer and npm. Clone the demo first:
+The browser uses the PubNub JavaScript SDK. DataSync holds the live records; Pub/Sub carries cheer notices; Access Manager checks tokens. No application database is needed.
+
+![Architecture diagram: Next.js browser pages and the PubNub JavaScript SDK exchange cheer notices with Pub/Sub and Runner/Cheer records with DataSync. Access Manager checks tokens. A separate server has session, timing and voice routes and no database. The drawing shows local key storage in .env.local.](docs/images/fig-architecture.png)
+
+[Image description](docs/image-descriptions.md#fig-architecture)
+
+The diagram shows local mode. The hosted Netlify demo uses our shared Access Manager for sessions, runner-link verification and timing. See [deployment and credentials](docs/setup.md#deploy-on-netlify).
+
+## One write updates the following phones
+
+![Left-to-right flow: Maya PATCHes runner.maya with km 31.621, lat 52.1923 and lng 21.0444. DataSync checks schema and token, stores the record and emits an event. Mum, Sam and Theo all display 31.62 km. Failed schema or projection checks store nothing and return 400 DS-0650 or 403 DS-0202.](docs/images/fig-one-write.png)
+
+[Image description](docs/image-descriptions.md#fig-one-write)
+
+[Subscription and reconnect code](docs/reference.md#events)
+
+## Two classes describe the state
+
+![Two schema tables compare Runner's default and phone projections with Cheer's default and private projections. Orange dots include a field; hollow circles omit it. Official timing fields are excluded from phone, and cheer message is excluded from default. Both classes expire after 172800 seconds from creation.](docs/images/fig-classes.png)
+
+[Image description](docs/image-descriptions.md#fig-classes)
+
+[Runner and Cheer fields](docs/reference.md#the-data) · [Class definitions](scripts/)
+
+## Each person gets a scoped token
+
+![A permission matrix compares Maya's runner token with each supporter's token. Maya can create, read and update her run through phone and read/update cheers through private. Supporters read the run and all cheers through default, but create/read/update only their own three cheer slots through private. Both receive run events and exchange cheer notices.](docs/images/fig-tokens.png)
+
+[Image description](docs/image-descriptions.md#fig-tokens)
+
+[Complete grants and token refresh](docs/reference.md#roles)
+
+## Permissions apply to individual fields
+
+![Two permission tables show different read and write projections. Sam's default cheer view contains from, atKm and status, but omits message; Maya's private view includes it. Leo's phone can write position and elapsed time but cannot write officialKm or officialSec. The organiser's server can write both timing fields.](docs/images/fig-field-permissions.png)
+
+[Image description](docs/image-descriptions.md#fig-field-permissions)
+
+[Official timing](docs/reference.md#official-times)
+
+## A reconnect reads the current record
+
+![A timeline shows Sam receiving writes at 39.97 and 39.99 km, missing nine events offline, then reading runner.maya once at 40.32 km before live events resume. Three phones show online, offline with the last position, and restored state. Missed events are not replayed.](docs/images/fig-reconnect.png)
+
+[Image description](docs/image-descriptions.md#fig-reconnect)
+
+## Bad writes leave the stored record unchanged
+
+![Two examples show whole writes rejected. A GPS PATCH sets lat and lng to null and gets 400 DS-0650; a subsequent GET retains lat 52.1923 and km 31.621. Leo's phone tries officialKm 42.195 and officialSec 9146 outside its projection and gets 403 DS-0202. Neither write changes stored state.](docs/images/fig-refused.png)
+
+[Image description](docs/image-descriptions.md#fig-refused)
+
+[Try a REST PATCH](docs/reference.md#try-the-api-with-curl)
+
+## A cheer combines stored state and a live notice
+
+![A six-step sequence diagram follows Mum, DataSync, Pub/Sub, Maya and Sam. Mum creates a private Cheer record, publishes its id on cheers.<slug>, and both recipients read it with their own projections. Maya receives and plays the words; Sam receives author and kilometre only. Maya stores heard status and publishes a heard notice to Mum.](docs/images/fig-cheer-flow.png)
+
+[Image description](docs/image-descriptions.md#fig-cheer-flow)
+
+[Cheer events](docs/reference.md#events) · [Headphones voice and browser fallback](docs/reference.md#the-headphones-voice)
+
+## Run locally or deploy
+
+Use Node.js 22 or newer. Clone the repository, then follow [keyset setup](docs/setup.md#set-up-your-keyset) before running the app:
 
 ```sh
 git clone https://github.com/PubNubDevelopers/Marathon-DataSync-Demo.git
 cd Marathon-DataSync-Demo
+npm ci
+cp .env.example .env.local
 ```
 
-1. [Create a PubNub account](https://admin.pubnub.com/#/register) and a keyset. DataSync is available to new accounts and to accounts that aren't actively using App Context.
-2. On the keyset, turn on **Access Manager**. DataSync rejects every request without it.
-3. Open the keyset's **DataSync** tab, turn on **Enable DataSync**, and pick a region. You can't change the region later.
-4. Create a **Service Integration** with **Read & write** on **DataSync** for this keyset. Copy the API key now; the Portal shows it once. Only `npm run setup:class` uses it.
-5. Copy `.env.example` to `.env.local` and fill in the publish key, subscribe key, Secret Key, the API key, and optionally `ELEVENLABS_API_KEY`.
-6. Install and create the classes:
+The setup guide covers credentials, schema creation, class events, `npm run check`, `npm run dev`, and [Netlify deployment](docs/setup.md#deploy-on-netlify).
 
-   ```sh
-   npm install
-   npm run setup:class
-   ```
+## Image descriptions for people and agents
 
-7. In the **DataSync** tab, under **Select entities to sync**, turn on events for `Runner` version 1 and `Cheer` version 1, and save. A new rule can take up to five minutes to apply.
-8. Check the whole setup against your keyset:
-
-   ```sh
-   npm run check
-   ```
-
-   It registers a runner, pins a cheer as Mum, reads it as Sam and as the runner, lists cheers through both tokens, tries two writes Sam isn't allowed to make, sends the empty GPS fix, tries a finish from the runner's phone (refused) and writes an official time as the organiser, and sends one REST `PATCH` while Sam's token listens. Every line should say `PASS`.
-9. Start the app and open <http://localhost:3000>:
-
-   ```sh
-   npm run dev
-   ```
-
-   Type a name and press **Simulate race day**. Open the supporters' link from the runner's page in another window, then press **Start** on the runner's page. On the supporters' page, **Send Maya a cheer**, type it and press **Send now**: the runner's page plays it as soon as it arrives. **Or pin it further along the course** leaves one that waits at a kilometre. The simulator runs the 42.195 km course at 30× speed; **Under the hood** can skip ahead 5 km at a time.
-
-## The data
-
-[`scripts/runner-class.json`](scripts/runner-class.json) and [`scripts/cheer-class.json`](scripts/cheer-class.json) define two entity classes, both with a TTL of two days.
-
-`Runner`, one per runner, id `runner.<slug>`:
-
-| Property | Path | Type | Required | Projections |
-|---|---|---|---|---|
-| `name` | `/payload/name` | string | yes | `__default__`, `phone` |
-| `bib` | `/payload/bib` | string | no | `__default__`, `phone` |
-| `lat`, `lng` | `/payload/lat`, `/payload/lng` | number | yes | `__default__`, `phone` |
-| `km` | `/payload/km` | number | yes | `__default__`, `phone` |
-| `paceSec`, `elapsedSec` | `/payload/…` | number | no | `__default__`, `phone` |
-| `fixAt` | `/payload/fixAt` | datetime | no | `__default__`, `phone` |
-| `trail` | `/payload/trail` | string, an [encoded polyline](https://developers.google.com/maps/documentation/utilities/polylinealgorithm) | no | `__default__`, `phone` |
-| `status` | `/status` | `ready`, `running`, `finished` | | `__default__`, `phone` |
-| `officialKm`, `officialSec` | `/payload/…` | number: the last timing mat crossed and the race time there | no | `__default__` |
-
-`Cheer`, one per pinned cheer, id `cheer.<runner slug>.<supporter key>-<n>`:
-
-| Property | Path | Type | Required | Projections |
-|---|---|---|---|---|
-| `runner` | `/payload/runner` | string, filtering `simple` | yes | `__default__`, `private` |
-| `from` | `/payload/from` | string | yes | `__default__`, `private` |
-| `atKm` | `/payload/atKm` | number | yes | `__default__`, `private` |
-| `heardAt` | `/payload/heardAt` | datetime | no | `__default__`, `private` |
-| `message` | `/payload/message` | string | yes | `private` |
-| `status` | `/status` | `pinned`, `heard` | | `__default__`, `private` |
-
-Every page lists the cheers for a runner with `getEntities({ class: 'Cheer', filterFast: 'runner == "<slug>"' })`. DataSync applies the caller's projection to each item.
-
-## Roles
-
-`POST /api/session` issues one of two tokens. Both last 60 minutes, and the pages ask for a new one five minutes before expiry.
-
-| | Runner | Supporter |
-|---|---|---|
-| `runner.<slug>` | `create`, `get`, `update`, projection `phone` | `get` |
-| Every cheer for the runner (pattern `^cheer\.<slug>\..+$`) | `get`, `update`, projection `private` | `get`, projection `__default__` |
-| Their own three cheer ids | | `create`, `get`, `update`, projection `private` |
-| Channel `runner.<slug>` (DataSync events) | `read` | `read` |
-| Channel `cheers.<slug>` (notices) and its presence channel | `read`, `write` | `read`, `write` |
-
-A supporter's own cheer ids are exact resources in the token, and an exact match wins over the pattern, so they read and write their own cheers through `private`. The runner proves who she is with the secret in her link, `/run/<slug>#k=<secret>`, an HMAC of the slug made with the Secret Key, so the app keeps no database of its own.
-
-Here's Mum's cheer, read with Sam's token and with the runner's:
-
-```jsonc
-// Sam                                   // the runner
-"payload": {                             "payload": {
-  "runner": "k7q2m9x4pd",                  "runner": "k7q2m9x4pd",
-  "from": "Mum",                           "from": "Mum",
-  "atKm": 32                               "atKm": 32,
-}                                          "message": "Remember that hike in the rain? …"
-                                         }
-```
-
-## Events
-
-With the event rules on, DataSync publishes an event for each change to a `Runner` on its id channel, `runner.<slug>`, with the default view. Every page subscribes there:
-
-```ts
-const sub = pubnub.dataSyncEntity(`runner.${slug}`).subscription()
-sub.onDataSync = (event) => apply(event.message.data)
-sub.subscribe()
-```
-
-The runner's page draws the run from these events too, not from the phone's own numbers, so every phone shows the same run at the same moment. Events missed while a page is offline aren't sent again, so the supporters' page reads the run again after a reconnect or a reload.
-
-A cheer is a `Cheer` record. Sent now, its `atKm` is the runner's distance as the supporter's page has it, so she's already there and her phone plays it as soon as it reads it; pinned, it waits for her. Cheers have no channel to subscribe to before they exist, so the author publishes `{ "type": "pinned", "id": "<cheer id>" }` on `cheers.<slug>` after creating one, and every page reads it through its own token. That notice is what makes a cheer live. When the runner hears it, her page first stores her position and waits for DataSync's event for it, so every map has her at the cheer, then sets `status` to `heard`, adds `heardAt`, and publishes `{ "type": "heard", "id": … }`.
-
-## The headphones voice
-
-The runner's page reads each cheer with an [ElevenLabs](https://elevenlabs.io) voice (Sarah, `eleven_v4_turbo`): "From Mum. …". The page sends the words it read through its own token to `POST /api/voice`, with the runner's slug and link secret in the `x-race-run` and `x-race-key` headers, so the route never needs the private projection itself. One runner can make 40 new lines an hour. If the route fails, the browser's own speech says the line.
-
-## Official times
-
-Timing mats lie every 5 km and at the finish. When the runner's record passes one, the official distance and race time go into `officialKm` and `officialSec`, and every supporter's map shows them ("Timing mat 30 km · 3:09:59", then "Official finish"). Only the server writes those fields, with its own client. The runner's token can't: its `phone` projection leaves them out, and DataSync refuses a write that names a field outside the token's projection, whole, with a `403`.
-
-In the demo, `POST /api/timing` stands in for the mats. The runner's page calls it with `{ "km": 25 }` and the runner's slug and secret in headers, like `/api/voice`, after DataSync has stored a distance past that mat. The route reads the run with the server's client, and records the mat only if the stored distance has reached it. A real race would call it from the chip-timing system.
-
-## Try the API with curl
-
-The runner's page has **Copy REST PATCH as curl** under **Under the hood**:
-
-```sh
-curl -X PATCH "https://ps.pndsn.com/v1/datasync/subkeys/$SUB_KEY/entities/runner.$SLUG?auth=$RUNNER_TOKEN&uuid=$RUNNER_USER_ID" \
-  -H 'Content-Type: application/json-patch+json' \
-  -d '[{"op":"replace","path":"/payload/lat","value":52.2412},{"op":"replace","path":"/payload/lng","value":21.0461}]'
-```
-
-Every open supporters' page moves the dot. Send a `null` instead and DataSync rejects the write:
-
-```json
-{ "errors": [{ "errorCode": "DS-0650", "message": "Non-nullable field at '/payload/lat' is null or missing", "path": "/payload/lat" }] }
-```
-
-## Deploy on Netlify
-
-Import this GitHub repository into Netlify. The included `netlify.toml` selects Node.js 24, `npm run build`, and the `.next` publish directory. Netlify's Next.js adapter runs the API routes as serverless functions.
-
-For the hosted team demo, set `ACCESS_MANAGER_URL` in the Netlify UI with Functions scope:
-
-```text
-https://devrel-demos-access-manager.netlify.app/.netlify/functions/api/marathon
-```
-
-The shared Access Manager must have its Marathon endpoints deployed first. It holds the PubNub keys, grants the same runner/supporter permissions described above, verifies runner links, and writes official timing results. The demo's `/api/session` and `/api/timing` routes forward requests to it. `/api/voice` also asks it to verify the runner link. Only public keys and scoped tokens reach the browser; the hosted demo needs no PubNub Secret Key.
-
-Set `ELEVENLABS_API_KEY` as a secret with Functions scope if you want the ElevenLabs voice. Without it, browser speech still reads the cheers. After changing environment variables, deploy again.
-
-For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and configure your own keyset's publish, subscribe, and Secret Key as Netlify environment variables with Functions scope. The local setup steps above remain the same.
-
-## Credentials
-
-| Variable | Used by | Where it lives |
-|---|---|---|
-| `ACCESS_MANAGER_URL` | The hosted session, timing, and voice routes | Netlify environment variables; a URL, not a secret |
-| `PUBNUB_PUBLISH_KEY`, `PUBNUB_SUBSCRIBE_KEY` | Local `/api/session`, which returns them to the browser at runtime | `.env.local`; held by the shared service for the team demo |
-| `PUBNUB_SECRET_KEY` | Local token grants and timing | `.env.local`; held only by the shared service for the team demo |
-| `PUBNUB_ADMIN_API_KEY` | `npm run setup:class` | `.env.local` on your machine. Don't deploy it. |
-| `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a secret Netlify environment variable |
-
-None of these are `NEXT_PUBLIC_` variables, so none are compiled into the browser bundle.
-
-## Project layout
-
-```
-app/api/session/route.ts   issues tokens
-app/api/voice/route.ts     the headphones voice, from ElevenLabs
-app/api/timing/route.ts    official times at the timing mats, written by the server
-app/page.tsx               the race's home
-app/run/[id]/page.tsx      the runner's page
-app/c/[id]/page.tsx        a supporter's page
-components/                the screens, the course map, and "Under the hood"
-lib/race.ts                entity ids, channel names, types
-lib/course.ts              the course, kilometre by kilometre
-lib/sim.ts                 the simulated race
-lib/server/pubnub.ts       Secret Key, grants, the runner secret, the timing mats
-scripts/                   the class definitions, setup:class, check, e2e, the course builder
-data/course.json           the course
-```
+Every image has alt text. The [description catalog](docs/image-descriptions.md) records layouts, labels, arrows, values and permission details for all 18 images. Agents can read the [JSON catalog](docs/images/descriptions.json) without interpreting pixels.
 
 ## Credits
 
-Map tiles come from [OpenFreeMap](https://openfreemap.org), with map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors. The course was routed on OpenStreetMap data and is under the ODbL; see `data/COURSE.md`. Fonts are [Nunito Sans](public/fonts/NunitoSans-OFL.txt) and [JetBrains Mono](public/fonts/JetBrainsMono-OFL.txt), both under the SIL Open Font License.
+Map tiles: [OpenFreeMap](https://openfreemap.org). Map data: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors; [course and ODbL details](data/COURSE.md). Fonts: [Nunito Sans](public/fonts/NunitoSans-OFL.txt) and [JetBrains Mono](public/fonts/JetBrainsMono-OFL.txt), SIL Open Font License.
