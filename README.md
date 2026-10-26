@@ -1,5 +1,7 @@
 # Riverside Marathon: cheers in your headphones
 
+[Try the hosted demo on Netlify](https://marathon-datasync-demo.netlify.app/).
+
 The official app of a fictional city marathon, so everyone can be with their runner the whole way. A runner shares a link. Supporters see where she is, live on the course map, from anywhere, and send her a cheer the moment she needs one: her phone reads it into her headphones as soon as it arrives, "From Mum. Remember that hike in the rain? …" A cheer can also wait at a kilometre further along the course and play when she gets there.
 
 PubNub is the whole backend. DataSync stores the runner and every cheer, validates each write against a schema, and decides which fields each person can read and write. Pub/Sub carries small notices ("a cheer was pinned", "she heard it"). Access Manager issues one token per person. The server code is three routes: one hands out those tokens, one makes the headphones voice with ElevenLabs, and one stands in for the organiser's timing mats.
@@ -15,7 +17,7 @@ PubNub is the whole backend. DataSync stores the runner and every cheer, validat
 
 ## Set up your keyset
 
-You need your own PubNub account. Nothing in this repo points at a shared keyset.
+For local setup, use your own PubNub account and keyset. The hosted team demo gets scoped tokens from the shared Access Manager, as described in [Deploy on Netlify](#deploy-on-netlify).
 
 Use Node.js 22 or newer and npm. Clone the demo first:
 

@@ -105,6 +105,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     stored: 0, // km in the last write DataSync accepted
     mats: new Set<number>(), // timing mats the organiser has recorded
     reporting: false,
+    reportAgain: false,
     cheers: new Map<string, Cheer>(),
     playing: new Set<string>(),
   })
@@ -345,14 +346,22 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   // reached it yet, the mat is tried again after the next write.
   const reportMats = useCallback(async () => {
     const s = t.current
-    if (s.reporting) return
+    // A final write can arrive while the previous timing request is finishing.
+    // Keep that work queued: after the finish there may be no more position writes.
+    if (s.reporting) {
+      s.reportAgain = true
+      return
+    }
     s.reporting = true
     try {
-      for (const mat of TIMING_MATS) {
-        if (s.mats.has(mat) || mat > s.stored + 1e-9) continue
-        if (!(await reportMat(mat, runnerRef.current))) break
-        s.mats.add(mat)
-      }
+      do {
+        s.reportAgain = false
+        for (const mat of TIMING_MATS) {
+          if (s.mats.has(mat) || mat > s.stored + 1e-9) continue
+          if (!(await reportMat(mat, runnerRef.current))) break
+          s.mats.add(mat)
+        }
+      } while (s.reportAgain)
     } finally {
       s.reporting = false
     }
