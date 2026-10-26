@@ -149,15 +149,31 @@ Every open supporters' page moves the dot. Send a `null` instead and DataSync re
 { "errors": [{ "errorCode": "DS-0650", "message": "Non-nullable field at '/payload/lat' is null or missing", "path": "/payload/lat" }] }
 ```
 
+## Deploy on Netlify
+
+Import this GitHub repository into Netlify. The included `netlify.toml` selects Node.js 24, `npm run build`, and the `.next` publish directory. Netlify's Next.js adapter runs the API routes as serverless functions.
+
+For the hosted team demo, set `ACCESS_MANAGER_URL` in the Netlify UI with Functions scope:
+
+```text
+https://devrel-demos-access-manager.netlify.app/.netlify/functions/api/marathon
+```
+
+The shared Access Manager must have its Marathon endpoints deployed first. It holds the PubNub keys, grants the same runner/supporter permissions described above, verifies runner links, and writes official timing results. The demo's `/api/session` and `/api/timing` routes forward requests to it. `/api/voice` also asks it to verify the runner link. Only public keys and scoped tokens reach the browser; the hosted demo needs no PubNub Secret Key.
+
+Set `ELEVENLABS_API_KEY` as a secret with Functions scope if you want the ElevenLabs voice. Without it, browser speech still reads the cheers. After changing environment variables, deploy again.
+
+For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and configure your own keyset's publish, subscribe, and Secret Key as Netlify environment variables with Functions scope. The local setup steps above remain the same.
+
 ## Credentials
 
 | Variable | Used by | Where it lives |
 |---|---|---|
-| `PUBNUB_PUBLISH_KEY`, `PUBNUB_SUBSCRIBE_KEY` | `/api/session`, which returns them to the browser at runtime | `.env.local`, or Vercel environment variables |
-| `PUBNUB_SECRET_KEY` | `/api/session`, to grant tokens | `.env.local` for local dev only |
-| `PUBNUB_CONNECTOR` | `/api/session` reads the Secret Key from Vercel Connect when this is set | Vercel environment variables |
+| `ACCESS_MANAGER_URL` | The hosted session, timing, and voice routes | Netlify environment variables; a URL, not a secret |
+| `PUBNUB_PUBLISH_KEY`, `PUBNUB_SUBSCRIBE_KEY` | Local `/api/session`, which returns them to the browser at runtime | `.env.local`; held by the shared service for the team demo |
+| `PUBNUB_SECRET_KEY` | Local token grants and timing | `.env.local`; held only by the shared service for the team demo |
 | `PUBNUB_ADMIN_API_KEY` | `npm run setup:class` | `.env.local` on your machine. Don't deploy it. |
-| `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a sensitive Vercel environment variable |
+| `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a secret Netlify environment variable |
 
 None of these are `NEXT_PUBLIC_` variables, so none are compiled into the browser bundle.
 

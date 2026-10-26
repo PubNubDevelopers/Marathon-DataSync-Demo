@@ -2,6 +2,7 @@ node_modules
 .next
 out
 .vercel
+.netlify
 .env*.local
 .env
 next-env.d.ts

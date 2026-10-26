@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 import PubNub from 'pubnub'
-import { getToken } from '@vercel/connect'
+import { accessManagerUrl, sharedRequest } from '@/lib/server/access-manager'
 import { PHONE_PROJECTION, PRIVATE_PROJECTION, SUPPORTER_SLOTS, TIMING_MATS, cheerId, cheerPattern, noticesChannel, runnerId, type RunnerEntity } from '@/lib/race'
 
 export const TOKEN_TTL_MINUTES = 60
@@ -13,13 +13,11 @@ export function keys() {
   return { publishKey, subscribeKey }
 }
 
-// The Secret Key comes from Vercel Connect at request time when a connector is
-// configured, and from .env.local in local dev. It never leaves this file.
+// Local mode uses a server-only Secret Key. Hosted sessions use the shared
+// Access Manager instead, so the Netlify demo needs no PubNub Secret Key.
 async function secretKey(): Promise<string> {
-  const connector = process.env.PUBNUB_CONNECTOR
-  if (connector) return getToken(connector, { subject: { type: 'app' } })
   const key = process.env.PUBNUB_SECRET_KEY
-  if (!key) throw new Error('Set PUBNUB_CONNECTOR (Vercel Connect) or PUBNUB_SECRET_KEY (local dev)')
+  if (!key) throw new Error('Set PUBNUB_SECRET_KEY for local dev or ACCESS_MANAGER_URL for hosted sessions')
   return key
 }
 
@@ -50,6 +48,10 @@ export async function issueRunnerSecret(slug: string) {
 }
 
 export async function verifyRunnerSecret(slug: string, given: string) {
+  if (accessManagerUrl()) {
+    const response = await sharedRequest('verify', { slug, secret: given })
+    return response.ok && (await response.json()).valid === true
+  }
   const expected = Buffer.from(await issueRunnerSecret(slug))
   const actual = Buffer.from(given)
   return expected.length === actual.length && timingSafeEqual(expected, actual)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { SLUG_PATTERN, type SessionRequest, type SessionResponse } from '@/lib/race'
 import { TOKEN_TTL_MINUTES, grantRunner, grantSupporter, issueRunnerSecret, keys, newSlug, verifyRunnerSecret } from '@/lib/server/pubnub'
+import { accessManagerUrl, sharedResponse } from '@/lib/server/access-manager'
 
 const USER_ID = /^[A-Za-z0-9_.-]{1,64}$/
 
@@ -20,6 +21,8 @@ export async function POST(req: Request) {
     return bad(400, 'Body must be JSON')
   }
   if (!body || !USER_ID.test(body.userId ?? '')) return bad(400, 'userId is missing or invalid')
+
+  if (accessManagerUrl()) return sharedResponse('session', body)
 
   try {
     let slug: string
