@@ -1,0 +1,20 @@
+{
+  "data": {
+    "description": "One runner in a race: live position, trail, distance, pace, and time from the runner's phone, and the official distance and time from the organiser's timing mats. Every supporter with the runner's link reads it. The runner's phone writes through the phone projection, which leaves out the official fields.",
+    "config": { "ttlSec": 172800 },
+    "properties": [
+      { "name": "name", "path": "/payload/name", "valueKind": "string", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "bib", "path": "/payload/bib", "valueKind": "string", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "lat", "path": "/payload/lat", "valueKind": "number", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "lng", "path": "/payload/lng", "valueKind": "number", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "km", "path": "/payload/km", "valueKind": "number", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "paceSec", "path": "/payload/paceSec", "valueKind": "number", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "elapsedSec", "path": "/payload/elapsedSec", "valueKind": "number", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "fixAt", "path": "/payload/fixAt", "valueKind": "datetime", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "trail", "path": "/payload/trail", "valueKind": "string", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "status", "path": "/status", "valueKind": "string", "projections": [{ "name": "__default__" }, { "name": "phone" }] },
+      { "name": "officialKm", "path": "/payload/officialKm", "valueKind": "number", "isNullable": true, "projections": [{ "name": "__default__" }] },
+      { "name": "officialSec", "path": "/payload/officialSec", "valueKind": "number", "isNullable": true, "projections": [{ "name": "__default__" }] }
+    ]
+  }
+}

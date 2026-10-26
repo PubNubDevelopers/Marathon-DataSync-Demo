@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.vercel
+.env*.local
+.env
+next-env.d.ts
+*.tsbuildinfo
+public/maplibre-gl-worker.mjs
+.DS_Store
+.env*
+!.env.example
+
+# course generator HTTP cache (scripts/build-course.mjs)
+scripts/.course-cache/

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "description": "A cheer pinned to a point on the course. Every supporter sees who left it and where. Only its author and the runner read the words.",
+    "config": { "ttlSec": 172800 },
+    "properties": [
+      { "name": "runner", "path": "/payload/runner", "valueKind": "string", "isNullable": false, "filtering": "simple", "projections": [{ "name": "__default__" }, { "name": "private" }] },
+      { "name": "from", "path": "/payload/from", "valueKind": "string", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "private" }] },
+      { "name": "atKm", "path": "/payload/atKm", "valueKind": "number", "isNullable": false, "projections": [{ "name": "__default__" }, { "name": "private" }] },
+      { "name": "heardAt", "path": "/payload/heardAt", "valueKind": "datetime", "isNullable": true, "projections": [{ "name": "__default__" }, { "name": "private" }] },
+      { "name": "message", "path": "/payload/message", "valueKind": "string", "isNullable": false, "projections": [{ "name": "private" }] },
+      { "name": "status", "path": "/status", "valueKind": "string", "projections": [{ "name": "__default__" }, { "name": "private" }] }
+    ]
+  }
+}
