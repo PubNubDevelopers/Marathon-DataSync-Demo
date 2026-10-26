@@ -68,4 +68,3 @@ For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and config
 | `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a secret Netlify environment variable |
 
 None of these are `NEXT_PUBLIC_` variables, so none are compiled into the browser bundle.
-

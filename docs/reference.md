@@ -116,4 +116,3 @@ lib/server/pubnub.ts       Secret Key, grants, the runner secret, the timing mat
 scripts/                   the class definitions, setup:class, check, e2e, the course builder
 data/course.json           the course
 ```
-

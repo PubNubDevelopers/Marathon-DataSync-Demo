@@ -62,10 +62,15 @@ export default function StartScreen() {
           <span>Your name</span>
           <input data-field="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Maya" maxLength={24} autoComplete="given-name" />
         </label>
-        <label className="field">
-          <span>Bib number</span>
-          <input data-field="bib" value={bib} onChange={(e) => setBib(e.target.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 6))} placeholder="4127" inputMode="numeric" />
-        </label>
+        <div className="field">
+          <label className="field">
+            <span>Race bib number (optional)</span>
+            <input data-field="bib" value={bib} onChange={(e) => setBib(e.target.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 6))} placeholder="4127" inputMode="numeric" aria-describedby="bib-help" />
+          </label>
+          <p className="hint" id="bib-help">
+            The number printed on the card pinned to your race shirt. For this demo, use any number or leave it blank.
+          </p>
+        </div>
         {error && <p className="error">{error}</p>}
         <div className="actions">
           <button className="btn primary" type="submit" disabled={!!busy} data-action="gps">
