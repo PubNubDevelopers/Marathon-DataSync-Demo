@@ -74,7 +74,7 @@ export type CheerPayload = {
 
 export type CheerEntity = Stored<CheerPayload>
 
-export type Notice = { type: 'pinned'; id: string } | { type: 'heard'; id: string; at: string }
+export type Notice = { type: 'pinned' | 'delivered'; id: string } | { type: 'heard'; id: string; at: string }
 
 // The session API. One route issues tokens for both roles.
 export type SessionRequest =

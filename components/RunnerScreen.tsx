@@ -12,6 +12,7 @@ import { apiError, browserUserId, createClient, keepTokenFresh, requestSession, 
 import { loadRunConfig, saveRunConfig, type RunConfig } from '@/lib/client/run-config'
 import { usePresence } from '@/lib/client/presence'
 import { speakLine, unlockVoice } from '@/lib/client/voice'
+import { recordedClip, type Announcement } from '@/lib/voice-catalog'
 import { reportMat } from '@/lib/client/timing'
 import { loadTrack, saveTrack } from '@/lib/client/track'
 import type { TrackPoint } from '@/lib/gpx'
@@ -83,6 +84,9 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   const [simSec, setSimSec] = useState(0)
   const [follow, setFollow] = useState(true)
   const [ending, setEnding] = useState(false)
+  const [voiceNote, setVoiceNote] = useState('')
+  const [failedVoices, setFailedVoices] = useState(new Set<string>())
+  const lastAnnouncement = useRef<Announcement>('start')
   // The run as DataSync has it, from the same events supporters get. The screen shows
   // this rather than the phone's own numbers, so every phone shows the same run at the
   // same moment. The phone's numbers only decide what to write.
@@ -112,8 +116,10 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     mats: new Set<number>(), // timing mats the organiser has recorded
     reporting: false,
     reportAgain: false,
+    ended: false,
     cheers: new Map<string, Cheer>(),
     playing: new Set<string>(),
+    failedAudio: new Set<string>(),
     // The run with a time on every point, for the GPX export. Only on this phone.
     track: [] as TrackPoint[],
     trackKm: 0, // the simulator's distance and time at the last track point
@@ -128,6 +134,11 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   const stopTracking = useRef<() => void>(() => {})
   const runnerRef = useRef({ slug, secret: '' })
 
+  const announce = useCallback((say: Announcement) => {
+    lastAnnouncement.current = say
+    void speakLine({ say }, runnerRef.current).then((result) => setVoiceNote(result.ok ? '' : 'Audio unavailable. Cheers stay visible as text.'))
+  }, [])
+
   const show = useCallback((next: RunnerEntity) => {
     const held = shownRef.current
     if (held && !isNewer(next, held)) return
@@ -141,6 +152,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     const held = s.cheers.get(c.id)
     // A cheer this phone already played stays heard, whatever an older read says.
     if (held?.status === 'heard' && c.status !== 'heard') return
+    if (held?.status === 'delivered' && c.status === 'pinned') return
     s.cheers.set(c.id, { ...held, ...c })
     setCheers([...s.cheers.values()].sort(byKm))
   }, [])
@@ -201,6 +213,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
         const p = existing.payload ?? {}
         const s2 = t.current
         s2.created = true
+        s2.ended = existing.status === 'finished'
         s2.distance = (p.km ?? 0) * 1000
         s2.simKm = p.km ?? 0
         s2.simSec = p.elapsedSec ?? 0
@@ -448,45 +461,71 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     return () => clearTimeout(timer)
   }, [refused])
 
-  // 5. Cheers play when the runner reaches them. The words come from this phone's
-  // private view of the Cheer. Then the cheer is marked heard, in DataSync for
-  // anyone who reloads and with a notice for the pages open now.
+  // 5. The words come from this phone's private view. Only completed audio playback
+  // marks a cheer heard. A failed attempt stays text and waits for an explicit retry.
   const play = useCallback(
     async (c: Cheer) => {
       const s = t.current
       if (!pubnub || s.playing.has(c.id) || !c.message) return
       s.playing.add(c.id)
-      if (s.mode === 'sim' && s.windAt == null && c.atKm >= WIND_FROM_KM) s.windAt = s.simKm
-      setFlash({ from: c.from, text: c.message, km: c.atKm, n: Date.now() })
-      setPulse((n) => n + 1)
-      navigator.vibrate?.([120, 60, 120])
+      s.failedAudio.delete(c.id)
+      setFailedVoices((held) => { const next = new Set(held); next.delete(c.id); return next })
+      const display = { id: c.id, from: c.from, text: c.message, km: c.atKm }
+      setFlash({ ...display, audio: recordedClip({ from: c.from, message: c.message }) ? 'preparing' : 'text-only', n: Date.now() })
+      // A text-only cheer reaches her too: the phone buzzes and the sim gets its lift.
+      const arrived = () => {
+        if (s.mode === 'sim' && s.windAt == null && c.atKm >= WIND_FROM_KM) s.windAt = s.simKm
+        setPulse((n) => n + 1)
+        navigator.vibrate?.([120, 60, 120])
+      }
+      const result = await speakLine({ from: c.from, message: c.message }, runnerRef.current, () => {
+        arrived()
+        setFlash({ ...display, audio: 'playing', n: Date.now() })
+      })
+      if (!result.ok && result.reason === 'text-only') arrived()
+      if (!result.ok && result.reason === 'unavailable') {
+        s.failedAudio.add(c.id)
+        setFailedVoices((held) => new Set(held).add(c.id))
+        setFlash({ ...display, audio: 'unavailable', n: Date.now() })
+        return
+      }
+      const status = result.ok ? 'heard' : 'delivered'
+      setFlash((held) => held?.id === c.id ? { ...held, audio: result.ok ? 'heard' : 'text-only' } : held)
       const heardAt = new Date().toISOString()
-      keepCheer({ ...c, status: 'heard', heardAt })
-      void speakLine({ from: c.from, message: c.message }, runnerRef.current, `From ${c.from}. ${c.message}`)
+      keepCheer({ ...c, status, ...(result.ok ? { heardAt } : {}) })
       // Store where she is first, and wait for DataSync's event for it (it reaches every page at
       // about the same moment), so supporters see her at the cheer's kilometre when it turns heard.
       while (s.writing) await s.writing
-      s.dirty = true
-      await writeRef.current()
-      const until = Date.now() + 3000
-      while ((shownRef.current?.payload?.km ?? 0) < c.atKm - 0.005 && Date.now() < until) await new Promise((r) => setTimeout(r, 100))
+      if (!s.ended) {
+        s.dirty = true
+        await writeRef.current()
+        const until = Date.now() + 3000
+        while ((shownRef.current?.payload?.km ?? 0) < c.atKm - 0.005 && Date.now() < until) await new Promise((r) => setTimeout(r, 100))
+      }
       try {
-        await pubnub.dataSync.updateEntity({ id: c.id, replace: { '/status': 'heard' }, add: { '/payload/heardAt': heardAt } })
+        await pubnub.dataSync.updateEntity({ id: c.id, replace: { '/status': status }, ...(result.ok ? { add: { '/payload/heardAt': heardAt } } : {}) })
       } catch {
         // The notice below still tells the pages open now.
       }
-      await pubnub.publish({ channel, message: { type: 'heard', id: c.id, at: heardAt } satisfies Notice }).catch(() => {})
+      const notice: Notice = result.ok ? { type: 'heard', id: c.id, at: heardAt } : { type: 'delivered', id: c.id }
+      await pubnub.publish({ channel, message: notice }).catch(() => {})
     },
     [pubnub, channel, keepCheer],
   )
   const playRef = useRef(play)
   playRef.current = play
+  const retryCheer = (cheer: Cheer) => {
+    if (!t.current.failedAudio.delete(cheer.id)) return
+    unlockVoice()
+    t.current.playing.delete(cheer.id)
+    void playRef.current(cheer)
+  }
 
   const due = useCallback(() => {
     if (phaseRef.current !== 'running') return
     const s = t.current
     const at = s.distance / 1000
-    const next = [...s.cheers.values()].filter((c) => c.status !== 'heard' && !s.playing.has(c.id) && c.atKm <= at + 0.005).sort(byKm)[0]
+    const next = [...s.cheers.values()].filter((c) => c.status === 'pinned' && !s.playing.has(c.id) && c.atKm <= at + 0.005).sort(byKm)[0]
     if (next) void playRef.current(next)
   }, [])
   dueRef.current = due
@@ -545,13 +584,14 @@ export default function RunnerScreen({ slug }: { slug: string }) {
 
   const finishRun = useCallback(async () => {
     stopTracking.current()
+    t.current.ended = true
     t.current.dirty = true
     saveTrack(slug, t.current.track)
     await write('finished')
     void wake.current?.release()
-    void speakLine({ say: 'finish' }, runnerRef.current, 'You finished. Well done!')
+    announce('finish')
     setPhase('finished')
-  }, [write, slug])
+  }, [write, slug, announce])
 
   const simStep = useCallback(
     (km: number, sec: number) => {
@@ -624,7 +664,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     if (!config) return
     unlockVoice()
     const resuming = (shownRef.current?.status ?? 'ready') !== 'ready'
-    void speakLine({ say: resuming ? 'resume' : 'start' }, runnerRef.current, resuming ? 'Back on.' : "You're on. Your supporters can cheer now.")
+    announce(resuming ? 'resume' : 'start')
     await keepAwake()
     if (!config.startedAt) {
       const next = { ...config, startedAt: Date.now() }
@@ -689,7 +729,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   const viewTrail = useMemo(() => decodePolyline(viewTrailCode), [viewTrailCode])
   const viewKm = sp?.km ?? 0
   const elapsed = sp?.elapsedSec != null ? sp.elapsedSec * 1000 : config?.mode === 'sim' ? simSec * 1000 : 0
-  const waiting = cheers.filter((c) => c.status !== 'heard')
+  const waiting = cheers.filter((c) => c.status === 'pinned')
   const next = waiting.filter((c) => c.atKm >= viewKm - 0.05).sort(byKm)[0]
   const started = phase === 'running' || phase === 'finished'
   const syncLabel = sync
@@ -791,6 +831,13 @@ export default function RunnerScreen({ slug }: { slug: string }) {
             </span>
           </p>
 
+          {voiceNote && (
+            <p className="voice-unavailable" role="status" data-audio-state="unavailable">
+              {voiceNote}{' '}
+              <button className="link" data-action="retry-voice" onClick={() => { unlockVoice(); announce(lastAnnouncement.current) }}>Retry audio</button>
+            </p>
+          )}
+
           {/* A GPS run ends when the runner says so. The simulator ends itself at the finish line. */}
           {phase === 'running' && config?.mode === 'gps' && (
             <button
@@ -815,13 +862,16 @@ export default function RunnerScreen({ slug }: { slug: string }) {
             ) : (
               <ul className="cheer-list">
                 {cheers.map((c) => (
-                  <li key={c.id} className={`${c.status === 'heard' ? 'heard' : ''} ${c === next ? 'next' : ''}`} data-cheer-km={c.atKm}>
+                  <li key={c.id} className={`${c.status === 'heard' ? 'heard' : c.status === 'delivered' ? 'delivered' : ''} ${c === next ? 'next' : ''}`} data-cheer-km={c.atKm} data-audio-state={failedVoices.has(c.id) ? 'unavailable' : c.status === 'delivered' ? 'text-only' : c.status === 'heard' ? 'heard' : 'waiting'}>
                     <span className="cheer-km mono">km {c.atKm.toFixed(1)}</span>
                     <span className="cheer-who">
                       <b>{c.from}</b>
-                      {c.status === 'heard' ? <span className="cheer-words">“{c.message}”</span> : <span className="cheer-words muted">plays when you get there</span>}
+                      {c.status === 'heard' || c.status === 'delivered' || failedVoices.has(c.id) ? <span className="cheer-words">“{c.message}”</span> : <span className="cheer-words muted">{recordedClip({ from: c.from, message: c.message ?? '' }) ? 'plays when you get there' : 'text-only cheer at this kilometre'}</span>}
+                      {failedVoices.has(c.id) && <span className="voice-unavailable small">Audio unavailable</span>}
                     </span>
-                    {c.status === 'heard' ? <span className="heard-tag">heard</span> : <Lock />}
+                    {failedVoices.has(c.id) ? (
+                      <button className="btn tiny" data-action="retry-cheer" onClick={() => retryCheer(c)}>Retry audio</button>
+                    ) : c.status === 'heard' ? <span className="heard-tag">heard</span> : c.status === 'delivered' ? <span className="delivered-tag">text only</span> : <Lock />}
                   </li>
                 ))}
               </ul>
@@ -838,7 +888,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
                 runner={runnerRef.current}
                 simulated={config?.mode === 'sim'}
                 track={() => t.current.track}
-                cheeredBy={[...new Set(cheers.filter((c) => c.status === 'heard').map((c) => c.from))]}
+                cheeredBy={[...new Set(cheers.filter((c) => c.status === 'heard' || c.status === 'delivered').map((c) => c.from))]}
               />
               <Link className="btn primary" href="/">
                 Back to the race

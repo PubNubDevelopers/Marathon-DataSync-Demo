@@ -125,7 +125,7 @@ try {
 
   // A cheer sent now, mid-race: it's at her current kilometre, so it plays as soon as it arrives.
   await sam.locator('[data-action=compose]').click()
-  await sam.locator('[data-field=message]').fill('Go go go!')
+  await sam.locator('[data-field=message]').fill("You're nearly there. We're waiting at the finish!")
   const sent = Date.now()
   await sam.locator('[data-action=send]').click()
   step(await ok(runner.locator('.cheer-flash[data-cheer-from=Sam]').waitFor({ timeout: 15000 })), "Sam's cheer, sent now, plays on the runner page", `${((Date.now() - sent) / 1000).toFixed(1)} s after the tap`)

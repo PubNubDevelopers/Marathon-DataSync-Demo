@@ -29,7 +29,7 @@
 | `atKm` | `/payload/atKm` | number | yes | `__default__`, `private` |
 | `heardAt` | `/payload/heardAt` | datetime | no | `__default__`, `private` |
 | `message` | `/payload/message` | string | yes | `private` |
-| `status` | `/status` | `pinned`, `heard` | | `__default__`, `private` |
+| `status` | `/status` | `pinned`, `heard`, `delivered` | | `__default__`, `private` |
 
 Every page lists the cheers for a runner with `getEntities({ class: 'Cheer', filterFast: 'runner == "<slug>"' })`. DataSync applies the caller's projection to each item.
 
@@ -71,11 +71,17 @@ sub.subscribe()
 
 The runner's page draws the run from these events too, not from the phone's own numbers, so every phone shows the same run at the same moment. Events missed while a page is offline aren't sent again, so the supporters' page reads the run again after a reconnect or a reload.
 
-A cheer is a `Cheer` record. Sent now, its `atKm` is the runner's distance as the supporter's page has it, so she's already there and her phone plays it as soon as it reads it; pinned, it waits for her. Cheers have no channel to subscribe to before they exist, so the author publishes `{ "type": "pinned", "id": "<cheer id>" }` on `cheers.<slug>` after creating one, and every page reads it through its own token. That notice is what makes a cheer live. When the runner hears it, her page first stores her position and waits for DataSync's event for it, so every map has her at the cheer, then sets `status` to `heard`, adds `heardAt`, and publishes `{ "type": "heard", "id": … }`.
+A cheer is a `Cheer` record. Sent now, its `atKm` is the runner's distance as the supporter's page has it, so she's already there and her phone receives it immediately; pinned, it waits for her. Cheers have no channel to subscribe to before they exist, so the author publishes `{ "type": "pinned", "id": "<cheer id>" }` on `cheers.<slug>` after creating one, and every page reads it through its own token. After a recording finishes playing, the runner's page sets `status` to `heard`, adds `heardAt`, and publishes a heard notice. A written cheer is displayed as text, stored with `status: "delivered"`, and announced with a separate delivered notice. It never receives `heardAt`. Both terminal statuses survive a reload and are excluded from pending cheers. A failed recording stays pending with a retry button and sends no heard notice.
 
 ## The headphones voice
 
-The runner's page reads each cheer with an [ElevenLabs](https://elevenlabs.io) voice (Sarah, `eleven_v4_turbo`): "From Mum. …". The page sends the words it read through its own token to `POST /api/voice`, with the runner's slug and link secret in the `x-race-run` and `x-race-key` headers, so the route never needs the private projection itself. One runner can make 40 new lines an hour. If the route fails, the browser's own speech says the line.
+The app plays saved [ElevenLabs](https://elevenlabs.io) recordings through Web Audio. `lib/voice-catalog.ts` lists the start, resume and finish announcements and three public demo cheers. Their files live under `public/audio/voice/v1/`, with voice, text and file checksums in `manifest.json`. They were recorded with Sarah (`gJU2icYQsdEmbGJ65Z8W`) and `eleven_v4`. The client fetches only these files and keeps decoded audio in memory for repeats. It makes no live TTS requests and uses no audio API key.
+
+The composer offers recorded cheers to every supporter. The generic clips speak only the message, while the sender's name stays on screen. A cheer matches a recording when its complete normalized message matches a catalog entry. The "Go Maya, go!" choice is offered only for a runner named Maya. Other written text is clearly labelled text only before sending and when delivered.
+
+The Start or Resume tap unlocks audio playback on phones. A recorded cheer becomes `heard` only after its audio finishes playing. If the file, decoding or playback fails, the runner sees the words with **Audio unavailable** and **Retry audio**. No browser voice is substituted. Failed recordings wait for an explicit retry. Intentionally written text is not an audio failure and has no audio retry button.
+
+For compatibility, `GET /api/voice?say=start|resume|finish` and `POST /api/voice { from, message }` still verify the runner link through `x-race-run` and `x-race-key`. Known lines return a `303` redirect to their public recording. Other valid written text returns `200 { "mode": "text-only" }`. All API responses use `Cache-Control: private, no-store`; the route never calls a speech provider or saves private words as public audio.
 
 ## Official times
 
@@ -118,7 +124,7 @@ Every open supporters' page moves the dot. Send a `null` instead and DataSync re
 
 ```
 app/api/session/route.ts   issues tokens
-app/api/voice/route.ts     the headphones voice, from ElevenLabs
+app/api/voice/route.ts     authenticated recorded-clip redirects and text-only responses
 app/api/timing/route.ts    official times at the timing mats, written by the server
 app/api/strava/            optional OAuth, status and GPX upload routes
 app/page.tsx               the race's home
@@ -128,6 +134,7 @@ components/                the screens, the course map, and "Under the hood"
 lib/race.ts                entity ids, channel names, types
 lib/course.ts              the course, kilometre by kilometre
 lib/sim.ts                 the simulated race
+lib/voice-catalog.ts       public recorded lines and exact sender/message matching
 lib/gpx.ts                 GPX 1.1 export from timestamped track points
 lib/client/track.ts        per-run full track kept on the runner's phone
 lib/server/strava.ts       Strava OAuth exchange and upload client

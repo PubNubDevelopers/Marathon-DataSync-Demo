@@ -1,0 +1,63 @@
+{
+  "provider": "ElevenLabs",
+  "voice": "Sarah - Mature, Reassuring, Confident",
+  "voiceId": "gJU2icYQsdEmbGJ65Z8W",
+  "modelId": "eleven_v4",
+  "created": "2026-10-29",
+  "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75
+  },
+  "outputFormat": "mp3_44100_128",
+  "mode": "recorded-only",
+  "clips": [
+    {
+      "id": "start",
+      "text": "You're on. Your supporters can cheer now.",
+      "file": "start.mp3",
+      "bytes": 65002,
+      "durationSeconds": 3.004063,
+      "sha256": "90bdd8d567e6e0ca96685eeff5ddce8a3d39e932353110cd8bca6ef480f1d4e2"
+    },
+    {
+      "id": "resume",
+      "text": "Back on. Your supporters' cheers will play here.",
+      "file": "resume.mp3",
+      "bytes": 76287,
+      "durationSeconds": 3.709375,
+      "sha256": "6d95dd26d8363b0c39ce47c292d5305596fc57bfb74d3826bedeeead35062638"
+    },
+    {
+      "id": "finish",
+      "text": "You finished. Well done!",
+      "file": "finish.mp3",
+      "bytes": 55807,
+      "durationSeconds": 2.429375,
+      "sha256": "2d809df6cf07c14b60813989fb4416af5a59274219a9b1c57c96f7ef7321a722"
+    },
+    {
+      "id": "cheer-go",
+      "text": "Go Maya, go!",
+      "file": "cheer-go.mp3",
+      "bytes": 49537,
+      "durationSeconds": 2.0375,
+      "sha256": "e9404d2fe825e021eb8abc8c6e70c0faf19fc892124874905a4d1b5a77531555"
+    },
+    {
+      "id": "cheer-hike",
+      "text": "Remember that hike in the rain? You wanted to turn back, and we made it to the top together. Keep going, love.",
+      "file": "cheer-hike.mp3",
+      "bytes": 135219,
+      "durationSeconds": 7.392625,
+      "sha256": "4b786ff2a4ef9739ad579ecf29709817331330cb72cd298c352c6fac88adeea8"
+    },
+    {
+      "id": "cheer-finish",
+      "text": "You're nearly there. We're waiting at the finish!",
+      "file": "cheer-finish.mp3",
+      "bytes": 68763,
+      "durationSeconds": 3.239125,
+      "sha256": "001463e7726fcd4993cd16d1a7e9762b683ed38c3b8af886d1985c358eb01bde"
+    }
+  ]
+}

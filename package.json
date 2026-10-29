@@ -16,7 +16,9 @@
     "setup:class": "node --env-file-if-exists=.env.local scripts/setup-class.mjs",
     "check": "node --env-file-if-exists=.env.local scripts/check.mjs",
     "postinstall": "node scripts/copy-map-worker.mjs",
-    "e2e": "node scripts/e2e.mjs"
+    "e2e": "node scripts/e2e.mjs",
+    "e2e:voice": "node scripts/voice-e2e.mjs",
+    "test:voice-api": "node scripts/voice-api-test.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.13.0",

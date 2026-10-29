@@ -7,6 +7,7 @@ import { Brand, Headphones, Live, Lock, Stat, initialsOf } from '@/components/ui
 import { apiError, browserUserId, createClient, keepTokenFresh, requestSession, saveName, savedName } from '@/lib/client/session'
 import { usePresence } from '@/lib/client/presence'
 import { COURSE_KM } from '@/lib/course'
+import { PUBLIC_CHEERS, recordedClip } from '@/lib/voice-catalog'
 import { agoLabel, decodePolyline, formatClock, formatKm, formatPace, type LngLat } from '@/lib/geo'
 import {
   CHEER_CLASS,
@@ -98,6 +99,7 @@ export default function SupporterScreen({ slug }: { slug: string }) {
   const keepCheer = useCallback((c: Cheer) => {
     const held = cheersRef.current.get(c.id)
     if (held?.status === 'heard' && c.status !== 'heard') return
+    if (held?.status === 'delivered' && c.status === 'pinned') return
     cheersRef.current.set(c.id, { ...held, ...c, mine: slots.current.includes(c.id) })
     setCheers([...cheersRef.current.values()].sort(byKm))
   }, [])
@@ -190,6 +192,9 @@ export default function SupporterScreen({ slug }: { slug: string }) {
       if (msg.type === 'heard') {
         const held = cheersRef.current.get(msg.id)
         if (held) keepCheer({ ...held, status: 'heard', heardAt: msg.at })
+      } else if (msg.type === 'delivered') {
+        const held = cheersRef.current.get(msg.id)
+        if (held) keepCheer({ ...held, status: 'delivered' })
       } else if (msg.type === 'pinned') {
         // Read it through this token: someone else's cheer comes without its message.
         void pubnub.dataSync
@@ -209,6 +214,8 @@ export default function SupporterScreen({ slug }: { slug: string }) {
 
   const p = run?.payload
   const runner = p?.name ?? 'your runner'
+  const recordedCheers = PUBLIC_CHEERS.filter((line) => !line.forRunner || line.forRunner === runner.trim())
+  const draftRecorded = !!recordedClip({ from: name, message: text })
   const lat = p?.lat
   const lng = p?.lng
   const pos = useMemo<LngLat | null>(() => (lat != null && lng != null ? [lng, lat] : null), [lat, lng])
@@ -222,7 +229,7 @@ export default function SupporterScreen({ slug }: { slug: string }) {
   const mine = cheers.filter((c) => c.mine)
   const free = slots.current.filter((s) => !cheersRef.current.has(s))
   // A cheer waiting further along the course. One sent now (at her kilometre) is about to play.
-  const nextMine = mine.filter((c) => c.status !== 'heard' && c.atKm > atKm + 0.05).sort(byKm)[0]
+  const nextMine = mine.filter((c) => c.status === 'pinned' && c.atKm > atKm + 0.05).sort(byKm)[0]
   const minsTo = (km: number) => (p?.paceSec ? Math.max(1, Math.round(((km - atKm) * p.paceSec) / 60)) : null)
   const running = status === 'running'
   // Slower than her average so far by more than 5%: the moment a cheer helps.
@@ -352,18 +359,27 @@ export default function SupporterScreen({ slug }: { slug: string }) {
                 {text.length}/{MESSAGE_MAX}
               </span>
             </label>
+            {recordedCheers.length > 0 && (
+              <div className="recorded-cheers">
+                <span className="small muted">Try a recorded cheer</span>
+                <div>
+                  {recordedCheers.map((line) => <button key={line.id} type="button" className="btn tiny" data-action="recorded-cheer" data-clip-id={line.id} title={line.message} onClick={() => setText(line.message)}>{line.label}</button>)}
+                </div>
+              </div>
+            )}
+            {text.trim() && <p className="hint" data-audio-state={draftRecorded ? 'recorded' : 'text-only'}>{draftRecorded ? 'This cheer plays as recorded audio.' : 'Text-only cheer. The runner will see your words.'}</p>}
             <p className="privacy">
-              <Lock /> Only {runner} hears the words. Other supporters see that you cheered.
+              <Lock /> Your cheer is private to you and {runner}. Other supporters see that you cheered.
             </p>
             {pinError && <p className="error small">{pinError}</p>}
             {mode === 'now' ? (
               <>
                 {/* Rounded down, so the cheer is never ahead of her: she's there, and it plays on arrival. */}
                 <button className="btn primary" data-action="send" disabled={pinning || !text.trim()} onClick={() => leave(Math.floor(atKm * 100) / 100)}>
-                  <Headphones /> {pinning ? 'Sending…' : 'Send now'}
+                  {draftRecorded && <Headphones />} {pinning ? 'Sending…' : 'Send now'}
                 </button>
                 <p className="hint">
-                  {runner} is at km {formatKm(atKm)} and hears it in her headphones as soon as it arrives.{' '}
+                  {runner} is at km {formatKm(atKm)}.{' '}
                   <button className="link" data-action="pin-mode" onClick={() => setMode('pin')}>
                     Or pin it further along the course
                   </button>
@@ -372,7 +388,7 @@ export default function SupporterScreen({ slug }: { slug: string }) {
             ) : (
               <>
             <div className="field">
-              <span>Where should {runner} hear it?</span>
+              <span>Where should {runner} get it?</span>
               <div className="km-pick">
                 <label className="km-input">
                   km
@@ -456,7 +472,7 @@ export default function SupporterScreen({ slug }: { slug: string }) {
               ) : (
                 <ul className="cheer-list">
                   {cheers.map((c) => (
-                    <li key={c.id} className={`${c.status === 'heard' ? 'heard' : ''} ${c.mine ? 'mine' : ''}`} data-cheer-km={c.atKm} data-cheer-from={c.from}>
+                    <li key={c.id} className={`${c.status === 'heard' ? 'heard' : c.status === 'delivered' ? 'delivered' : ''} ${c.mine ? 'mine' : ''}`} data-cheer-km={c.atKm} data-cheer-from={c.from}>
                       <span className="cheer-km mono">km {c.atKm.toFixed(1)}</span>
                       <span className="cheer-who">
                         <b>{c.mine ? 'You' : c.from}</b>
@@ -464,11 +480,11 @@ export default function SupporterScreen({ slug }: { slug: string }) {
                           <span className="cheer-words">“{c.message}”</span>
                         ) : (
                           <span className="cheer-words private">
-                            <Lock /> only {runner} hears this
+                            <Lock /> only {runner} gets the words
                           </span>
                         )}
                       </span>
-                      {c.status === 'heard' ? <span className="heard-tag">{runner} heard it</span> : <span className="sent-tag">waiting</span>}
+                      {c.status === 'heard' ? <span className="heard-tag">{runner} heard it</span> : c.status === 'delivered' ? <span className="delivered-tag">delivered as text</span> : <span className="sent-tag">waiting</span>}
                     </li>
                   ))}
                 </ul>
@@ -493,7 +509,7 @@ export default function SupporterScreen({ slug }: { slug: string }) {
             }}
           >
             <h2>Who's cheering?</h2>
-            <p className="muted">The runner hears your name with each cheer.</p>
+            <p className="muted">The runner sees your name with each cheer.</p>
             <input data-field="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Mum" maxLength={24} />
             <button className="btn primary" type="submit">
               Follow the race

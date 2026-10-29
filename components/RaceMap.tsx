@@ -219,6 +219,7 @@ export default function RaceMap({ position, animateMs = 1000, trailPoints, initi
       const el = m.getElement()
       el.classList.add('cheer-pin')
       el.classList.toggle('heard', p.status === 'heard')
+      el.classList.toggle('delivered', p.status === 'delivered')
       el.classList.toggle('mine', !!p.mine)
       el.dataset.km = p.atKm.toFixed(1)
       el.innerHTML = pinHtml(p)

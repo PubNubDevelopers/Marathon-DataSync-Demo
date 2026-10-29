@@ -17,7 +17,7 @@ cd Marathon-DataSync-Demo
 2. On the keyset, turn on **Access Manager**. DataSync rejects every request without it.
 3. Open the keyset's **DataSync** tab, turn on **Enable DataSync**, and pick a region. You can't change the region later.
 4. Create a **Service Integration** with **Read & write** on **DataSync** for this keyset. Copy the API key now; the Portal shows it once. Only `npm run setup:class` uses it.
-5. Copy `.env.example` to `.env.local` and fill in the publish key, subscribe key, Secret Key, the API key, and optionally `ELEVENLABS_API_KEY`.
+5. Copy `.env.example` to `.env.local` and fill in the publish key, subscribe key, Secret Key and provisioning API key.
 6. Install and create the classes:
 
    ```sh
@@ -53,7 +53,7 @@ https://devrel-demos-access-manager.netlify.app/.netlify/functions/api/marathon
 
 The shared Access Manager must have its Marathon endpoints deployed first. It holds the PubNub keys, grants the same runner/supporter permissions described above, verifies runner links, and writes official timing results. The demo's `/api/session` and `/api/timing` routes forward requests to it. `/api/voice` also asks it to verify the runner link. Only public keys and scoped tokens reach the browser; the hosted demo needs no PubNub Secret Key.
 
-Set `ELEVENLABS_API_KEY` as a secret with Functions scope if you want the ElevenLabs voice. Without it, browser speech still reads the cheers. After changing environment variables, deploy again.
+The start, resume and finish announcements and three demo cheers are shipped as ElevenLabs audio files. They need no API key. All supporters can choose a recorded cheer; custom written cheers remain text and are marked delivered as text. The app makes no voice-generation requests. If a recording cannot play, its words stay visible with **Audio unavailable** and **Retry audio**, and the cheer is not marked heard.
 
 For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and configure your own keyset's publish, subscribe, and Secret Key as Netlify environment variables with Functions scope. The local setup steps above remain the same.
 
@@ -81,7 +81,10 @@ Without these two variables, the finish screen still offers **Save GPX**. You ca
 | `PUBNUB_PUBLISH_KEY`, `PUBNUB_SUBSCRIBE_KEY` | Local `/api/session`, which returns them to the browser at runtime | `.env.local`; held by the shared service for the team demo |
 | `PUBNUB_SECRET_KEY` | Local token grants and timing | `.env.local`; held only by the shared service for the team demo |
 | `PUBNUB_ADMIN_API_KEY` | `npm run setup:class` | `.env.local` on your machine. Don't deploy it. |
-| `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a secret Netlify environment variable |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | Optional `/api/strava` routes | `.env.local`, or Netlify environment variables with Functions scope; keep the client secret private |
 
 None of these are `NEXT_PUBLIC_` variables, so none are compiled into the browser bundle.
+
+## Check audio playback
+
+With the app running, `npm run e2e:voice -- http://localhost:3000` checks the bundled MP3 files, actual Web Audio playback, text-only delivery and visible recording failure/retry behavior. `npm run test:voice-api` checks the actual route with mocked runner authorization, including redirects to known recordings and the text-only response for custom words. Neither suite needs an ElevenLabs account. There is no live generation path to configure.

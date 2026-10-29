@@ -47,7 +47,7 @@ export default function StartScreen() {
           <span className="accent">in your headphones.</span>
         </h1>
         <p className="lede">
-          Share your link. Supporters follow you live and leave cheers anywhere on the course, even from home. You hear each one when you get there.
+          Share your link. Supporters follow you live and leave cheers along the course. Hear recorded cheers in your headphones and see written cheers on screen.
         </p>
       </section>
 

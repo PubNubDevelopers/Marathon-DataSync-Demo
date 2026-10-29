@@ -76,7 +76,9 @@ The diagram shows local mode. The hosted Netlify demo uses our shared Access Man
 
 [Image description](docs/image-descriptions.md#fig-cheer-flow)
 
-[Cheer events](docs/reference.md#events) · [Headphones voice and browser fallback](docs/reference.md#the-headphones-voice)
+[Cheer events](docs/reference.md#events) · [Recorded headphones voice](docs/reference.md#the-headphones-voice)
+
+The start, resume and finish announcements and three demo cheers use bundled ElevenLabs recordings. Every supporter can choose a recorded cheer or write a text-only cheer. Recordings speak the message; the sender's name stays on screen. A recording is marked heard only after its audio finishes playing. Written cheers are marked delivered as text. If a recording cannot play, its words stay visible with **Audio unavailable** and **Retry audio**. The app makes no live voice-generation requests and needs no audio API key.
 
 ## Keep the finished run
 
