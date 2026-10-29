@@ -57,6 +57,22 @@ Set `ELEVENLABS_API_KEY` as a secret with Functions scope if you want the Eleven
 
 For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and configure your own keyset's publish, subscribe, and Secret Key as Netlify environment variables with Functions scope. The local setup steps above remain the same.
 
+## Strava export
+
+After a run, **Save GPX** downloads a GPX 1.1 file with a timestamp on every recorded point. The full track stays in this browser's `localStorage`; DataSync keeps the simplified trail used by supporters' maps. The app saves the track during the run, when the page is hidden, and at the finish. If browser storage is blocked or full, keep the page open until you download the file. A runner link opened on another phone restores the shared race state but does not copy the original phone's full track.
+
+For a GPS run, tap **End run**, then tap again to confirm. The simulator finishes itself. Simulated GPX files are labelled as simulated, and their finish screen has no Strava upload button.
+
+To enable direct upload for GPS runs:
+
+1. [Register a Strava API app](https://www.strava.com/settings/api) and set its Authorization Callback Domain to the deployed site's domain, without `https://` or a path. Use `localhost` for local development.
+2. Add `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` to `.env.local`, or to Netlify environment variables with Functions scope, then redeploy. Keep the client secret on the server.
+3. Finish a GPS run and choose **Connect with Strava**. Allow the requested `activity:write` scope, then choose **Upload to Strava**. The server uploads the GPX and checks Strava's processing result. **View on Strava** appears when Strava returns the activity ID; a pending result means processing is still in progress.
+
+The short-lived access token is kept in an httpOnly cookie scoped to `/api/strava`; the browser's JavaScript never receives it. The app does not retain a refresh token, so it asks the runner to reconnect after expiry. Strava controls which athletes a registered API app may connect. Check its current capacity before inviting other runners.
+
+Without these two variables, the finish screen still offers **Save GPX**. You can import the downloaded file into another running app yourself. See Strava's [authentication](https://developers.strava.com/docs/authentication/) and [upload](https://developers.strava.com/docs/uploads/) documentation for the API requirements.
+
 ## Credentials
 
 | Variable | Used by | Where it lives |
@@ -66,5 +82,6 @@ For your own independent deployment, leave `ACCESS_MANAGER_URL` unset and config
 | `PUBNUB_SECRET_KEY` | Local token grants and timing | `.env.local`; held only by the shared service for the team demo |
 | `PUBNUB_ADMIN_API_KEY` | `npm run setup:class` | `.env.local` on your machine. Don't deploy it. |
 | `ELEVENLABS_API_KEY` | `/api/voice` | `.env.local`, or a secret Netlify environment variable |
+| `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | Optional `/api/strava` routes | `.env.local`, or Netlify environment variables with Functions scope; keep the client secret private |
 
 None of these are `NEXT_PUBLIC_` variables, so none are compiled into the browser bundle.

@@ -83,6 +83,21 @@ Timing mats lie every 5 km and at the finish. When the runner's record passes on
 
 In the demo, `POST /api/timing` stands in for the mats. The runner's page calls it with `{ "km": 25 }` and the runner's slug and secret in headers, like `/api/voice`, after DataSync has stored a distance past that mat. The route reads the run with the server's client, and records the mat only if the stored distance has reached it. A real race would call it from the chip-timing system.
 
+## GPX and Strava
+
+The runner's phone records `[longitude, latitude, timestamp]` points separately from the simplified DataSync trail. After the finish, `lib/gpx.ts` turns that local track into GPX 1.1 with a time on each point. `race.track.<slug>` in `localStorage` keeps it through reloads when browser storage is available. Simulated exports include "simulated" in the filename and activity title.
+
+The optional Strava upload uses the runner-link check through the same local or shared Access Manager as the rest of the app:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/strava` | Reports whether credentials are configured and this browser has a valid token; never returns the token |
+| `GET /api/strava/connect` | Starts OAuth with `activity:write` and a random state cookie; `back` accepts only a local runner page |
+| `GET /api/strava/callback` | Verifies state and granted scope, exchanges the code, and keeps the access token in an httpOnly cookie |
+| `POST /api/strava/upload` | Verifies the runner link, accepts `{ gpx, name, description }`, uploads using the token cookie, and checks processing status |
+
+Upload requires the runner's slug and secret in the `x-race-run` and `x-race-key` headers. The server uses the runner slug as Strava's `external_id` to identify repeat uploads. Without Strava credentials, connect and upload return `503` and GPX download remains available. See [Strava setup](setup.md#strava-export).
+
 ## Try the API with curl
 
 The runner's page has **Copy REST PATCH as curl** under **Under the hood**:
@@ -105,6 +120,7 @@ Every open supporters' page moves the dot. Send a `null` instead and DataSync re
 app/api/session/route.ts   issues tokens
 app/api/voice/route.ts     the headphones voice, from ElevenLabs
 app/api/timing/route.ts    official times at the timing mats, written by the server
+app/api/strava/            optional OAuth, status and GPX upload routes
 app/page.tsx               the race's home
 app/run/[id]/page.tsx      the runner's page
 app/c/[id]/page.tsx        a supporter's page
@@ -112,6 +128,9 @@ components/                the screens, the course map, and "Under the hood"
 lib/race.ts                entity ids, channel names, types
 lib/course.ts              the course, kilometre by kilometre
 lib/sim.ts                 the simulated race
+lib/gpx.ts                 GPX 1.1 export from timestamped track points
+lib/client/track.ts        per-run full track kept on the runner's phone
+lib/server/strava.ts       Strava OAuth exchange and upload client
 lib/server/pubnub.ts       Secret Key, grants, the runner secret, the timing mats
 scripts/                   the class definitions, setup:class, check, e2e, the course builder
 data/course.json           the course

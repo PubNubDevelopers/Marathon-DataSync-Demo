@@ -78,6 +78,20 @@ The diagram shows local mode. The hosted Netlify demo uses our shared Access Man
 
 [Cheer events](docs/reference.md#events) · [Headphones voice and browser fallback](docs/reference.md#the-headphones-voice)
 
+## Keep the finished run
+
+![Three illustrated app screens show End run, Save GPX and optional Connect with Strava, then View on Strava. The finished example is 4.98 km in 31:41. The picture illustrates the optional configured export flow.](docs/images/fig-strava-export.png)
+
+[Image description](docs/image-descriptions.md#fig-strava-export)
+
+For a GPS run, press **End run**, then **Save GPX** to download the timestamped track recorded by this browser. The full track stays in local storage; DataSync holds the simplified trail used on supporters' maps. Export needs at least two recorded points. The app saves points periodically and when the page closes or the run finishes. Saved points survive a reload in the same browser when local storage is available; they do not transfer to another device.
+
+Direct Strava upload is optional. With `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` configured on the server, a GPS runner can connect Strava, authorize uploads and send the GPX. Without those credentials, GPX download works on its own. Simulated exports are labeled simulated, and their finish screen offers GPX download without a Strava upload button. See [Strava setup](docs/setup.md#strava-export).
+
+## Video review copy
+
+[Watch the original 91-second film](https://youtu.be/NK_JBg687Go). This YouTube copy is private and requires access; it is not a public embed. The fictional race uses real PubNub calls. The film predates GPX and Strava export.
+
 ## Run locally or deploy
 
 Use Node.js 22 or newer. Clone the repository, then follow [keyset setup](docs/setup.md#set-up-your-keyset) before running the app:
@@ -93,7 +107,7 @@ The setup guide covers credentials, schema creation, class events, `npm run chec
 
 ## Image descriptions for people and agents
 
-Every image has alt text. The [description catalog](docs/image-descriptions.md) records layouts, labels, arrows, values and permission details for all 18 images. Agents can read the [JSON catalog](docs/images/descriptions.json) without interpreting pixels.
+Every image has alt text. The [description catalog](docs/image-descriptions.md) records layouts, labels, arrows, values and permission details for all 19 images. Agents can read the [JSON catalog](docs/images/descriptions.json) without interpreting pixels.
 
 ## Credits
 

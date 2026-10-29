@@ -431,3 +431,13 @@ button.link { appearance: none; border: 0; background: none; padding: 0; font: i
 .cheer-pin .pin-head > span { transform: rotate(45deg); }
 .sync-who { margin-left: auto; color: var(--text-2); }
 .runner .brand-sub { font-size: 10px; }
+
+/* After the finish: the run as a GPX file, and to Strava when the server has a Strava API app. */
+.export { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.export-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.finished .export .btn { margin-top: 0; }
+.btn.strava { background: #fc5200; box-shadow: 0 10px 26px rgba(252, 82, 0, 0.3); }
+.btn.strava:hover:not(:disabled) { background: #e34a00; }
+.strava-link { color: #fc5200; font-weight: 700; text-decoration: underline; align-self: flex-start; }
+.export-note { color: var(--text-2); }
+.end-run { align-self: flex-start; }

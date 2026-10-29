@@ -6,12 +6,15 @@ import QRCode from 'qrcode'
 import RaceMap from '@/components/RaceMap'
 import DevPanel, { type ActionResult } from '@/components/DevPanel'
 import CheerFlash, { type Flash } from '@/components/CheerFlash'
+import StravaExport from '@/components/StravaExport'
 import { Brand, Headphones, Live, Lock, Stat, initialsOf } from '@/components/ui'
 import { apiError, browserUserId, createClient, keepTokenFresh, requestSession, savedName } from '@/lib/client/session'
 import { loadRunConfig, saveRunConfig, type RunConfig } from '@/lib/client/run-config'
 import { usePresence } from '@/lib/client/presence'
 import { speakLine, unlockVoice } from '@/lib/client/voice'
 import { reportMat } from '@/lib/client/timing'
+import { loadTrack, saveTrack } from '@/lib/client/track'
+import type { TrackPoint } from '@/lib/gpx'
 import { COURSE_KM, courseUpTo, pointAtKm, START } from '@/lib/course'
 import { decodePolyline, distanceM, encodePolyline, formatClock, formatKm, formatPace, roundPoint, simplify, type LngLat } from '@/lib/geo'
 import { SIM_SPEED, WIND_FROM_KM, advance, simPace, timeTo } from '@/lib/sim'
@@ -42,6 +45,8 @@ const PACE_WINDOW_MS = 30_000
 const GPS_LOST_SHOWN_MS = 9000
 const EVENT_GRACE_MS = 2000 // how long a write's own response waits for the event before it's shown instead
 const REFUSED_SHOWN_MS = 9000
+const TRACK_STEP_KM = 0.02 // the simulator's track for the GPX export, a point every 20 m
+const TRACK_SAVE_MS = 15_000
 
 type Phase = 'loading' | 'ready' | 'running' | 'finished' | 'error'
 type Sync = { at: number; status: number; code?: string }
@@ -77,6 +82,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   const [refused, setRefused] = useState<Refused | null>(null)
   const [simSec, setSimSec] = useState(0)
   const [follow, setFollow] = useState(true)
+  const [ending, setEnding] = useState(false)
   // The run as DataSync has it, from the same events supporters get. The screen shows
   // this rather than the phone's own numbers, so every phone shows the same run at the
   // same moment. The phone's numbers only decide what to write.
@@ -108,6 +114,11 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     reportAgain: false,
     cheers: new Map<string, Cheer>(),
     playing: new Set<string>(),
+    // The run with a time on every point, for the GPX export. Only on this phone.
+    track: [] as TrackPoint[],
+    trackKm: 0, // the simulator's distance and time at the last track point
+    trackSec: 0,
+    trackSaved: 0,
   })
   const tokens = useRef<ReturnType<typeof keepTokenFresh> | null>(null)
   const dueRef = useRef<() => void>(() => {})
@@ -197,6 +208,10 @@ export default function RunnerScreen({ slug }: { slug: string }) {
         setKm(s2.simKm)
         if (p.lat != null && p.lng != null) s2.pos = [p.lng, p.lat]
         s2.trail = decodePolyline(p.trail)
+        s2.track = loadTrack(slug)
+        s2.trackSaved = s2.track.length
+        s2.trackKm = s2.simKm
+        s2.trackSec = s2.simSec
         show(existing)
         setPhase(existing.status === 'finished' ? 'finished' : 'ready')
 
@@ -507,6 +522,7 @@ export default function RunnerScreen({ slug }: { slug: string }) {
         }
         s.last = p
         const at = fix.timestamp
+        s.track.push([+p[0].toFixed(6), +p[1].toFixed(6), Math.round(at)])
         s.window.push({ at, m: s.distance })
         while (s.window.length > 2 && s.window[1].at <= at - PACE_WINDOW_MS) s.window.shift()
         const first = s.window[0]
@@ -530,15 +546,30 @@ export default function RunnerScreen({ slug }: { slug: string }) {
   const finishRun = useCallback(async () => {
     stopTracking.current()
     t.current.dirty = true
+    saveTrack(slug, t.current.track)
     await write('finished')
     void wake.current?.release()
     void speakLine({ say: 'finish' }, runnerRef.current, 'You finished. Well done!')
     setPhase('finished')
-  }, [write])
+  }, [write, slug])
 
   const simStep = useCallback(
     (km: number, sec: number) => {
       const s = t.current
+      // The track for the GPX export: the course every 20 m since the last point, timed by
+      // the simulated race clock from the moment the runner pressed Start.
+      if (km > s.trackKm) {
+        const t0 = s.startedAt || Date.now()
+        const at = (k: number, sc: number): TrackPoint => {
+          const [lng, lat] = pointAtKm(k)
+          return [+lng.toFixed(6), +lat.toFixed(6), Math.round(t0 + sc * 1000)]
+        }
+        if (!s.track.length) s.track.push(at(s.trackKm, s.trackSec))
+        for (let k = s.trackKm + TRACK_STEP_KM; k < km; k += TRACK_STEP_KM) s.track.push(at(k, s.trackSec + ((sec - s.trackSec) * (k - s.trackKm)) / (km - s.trackKm)))
+        s.track.push(at(km, sec))
+        s.trackKm = km
+        s.trackSec = sec
+      }
       s.simKm = km
       s.simSec = sec
       s.distance = km * 1000
@@ -610,6 +641,27 @@ export default function RunnerScreen({ slug }: { slug: string }) {
 
   useEffect(() => () => stopTracking.current(), [])
 
+  // Keep the recorded track through a reload in the middle of the run.
+  useEffect(() => {
+    if (phase !== 'running') return
+    const persist = () => {
+      const s = t.current
+      if (s.track.length === s.trackSaved) return
+      saveTrack(slug, s.track)
+      s.trackSaved = s.track.length
+    }
+    const hidden = () => { if (document.visibilityState === 'hidden') persist() }
+    const timer = setInterval(persist, TRACK_SAVE_MS)
+    addEventListener('pagehide', persist)
+    document.addEventListener('visibilitychange', hidden)
+    return () => {
+      persist()
+      clearInterval(timer)
+      removeEventListener('pagehide', persist)
+      document.removeEventListener('visibilitychange', hidden)
+    }
+  }, [phase, slug])
+
   // In a simulated run, G sends another empty GPS fix, for demos on a laptop.
   useEffect(() => {
     if (config?.mode !== 'sim' || phase !== 'running') return
@@ -644,7 +696,9 @@ export default function RunnerScreen({ slug }: { slug: string }) {
     ? sync.status < 300
       ? `Saved to DataSync ${Math.max(0, Math.round((now - sync.at) / 1000))} s ago`
       : `Last write failed: ${sync.status} ${sync.code ?? ''}`
-    : 'Not saved yet'
+    : phase === 'finished'
+      ? 'Saved to DataSync'
+      : 'Not saved yet'
 
   if (phase === 'error') {
     return (
@@ -737,6 +791,18 @@ export default function RunnerScreen({ slug }: { slug: string }) {
             </span>
           </p>
 
+          {/* A GPS run ends when the runner says so. The simulator ends itself at the finish line. */}
+          {phase === 'running' && config?.mode === 'gps' && (
+            <button
+              className={`btn small end-run ${ending ? 'danger-ghost' : 'ghost'}`}
+              onClick={() => (ending ? void finishRun() : setEnding(true))}
+              onBlur={() => setEnding(false)}
+              data-action="end"
+            >
+              {ending ? 'Tap again to end your run' : 'End run'}
+            </button>
+          )}
+
           <div className="card cheers-card" data-waiting={waiting.length}>
             <div className="cheers-head">
               <h3>
@@ -768,6 +834,12 @@ export default function RunnerScreen({ slug }: { slug: string }) {
               <p>
                 {formatKm(viewKm)} km in {formatClock(elapsed)}. Your supporters got the final numbers.
               </p>
+              <StravaExport
+                runner={runnerRef.current}
+                simulated={config?.mode === 'sim'}
+                track={() => t.current.track}
+                cheeredBy={[...new Set(cheers.filter((c) => c.status === 'heard').map((c) => c.from))]}
+              />
               <Link className="btn primary" href="/">
                 Back to the race
               </Link>

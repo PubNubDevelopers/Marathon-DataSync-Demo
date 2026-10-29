@@ -451,3 +451,30 @@ Image: [reload-reads-latest-state.png](images/reload-reads-latest-state.png) · 
 - `6:21/km`
 - `4:17:03`
 - `Timing mat 40 km · 4:15:01`
+
+## fig-strava-export
+
+**Save the finished run as GPX or upload it to Strava**
+
+Image: [fig-strava-export.png](images/fig-strava-export.png) · 1600 × 1379 pixels
+
+**Alt text:** Three illustrated app screens show End run, a finished 4.98 km run with Save GPX and Connect with Strava, then a View on Strava link. The image explains the export flow; it is not evidence of a live Strava upload.
+
+**Detailed description:** A navy diagram headed After the finish, the run goes to Strava has three numbered columns connected by white arrows. End the run highlights End run on a phone showing 4.59 km, pace 6:11/km and time 28:55. Save it or send it shows a finished 4.98 km run, pace 6:53/km and time 31:41, with Save GPX and Connect with Strava highlighted. On Strava shows the same finish card with View on Strava highlighted; it is still the app screen, not a Strava activity page. Mum's km 2.0 cheer is marked heard. A footer says the full track stays on the runner's phone while DataSync keeps the simplified trail, and simulated runs can save a labeled file but never go to Strava. The illustration explains the optional configured flow, not a verified upload to a live account.
+
+**Visible labels and values:**
+
+- `AN EXTRA IN THE DEMO APP`
+- `After the finish, the run goes to Strava`
+- `End the run`
+- `Save it or send it`
+- `On Strava`
+- `End run`
+- `4.98 km`
+- `6:53/km`
+- `31:41`
+- `You finished`
+- `Save GPX`
+- `Connect with Strava`
+- `View on Strava`
+- `Back to the race`

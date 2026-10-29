@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Visual descriptions of all 18 Marathon images. These describe the recorded or illustrated content, not live race results. Use the image id to match README and article references.",
+  "description": "Visual descriptions of all 19 Marathon images. These describe the recorded or illustrated content, not live race results. Use the image id to match README and article references.",
   "images": [
     {
       "file": "cover-kilometre-32.png",
@@ -524,6 +524,38 @@
       "image_url": "https://raw.githubusercontent.com/PubNubDevelopers/Marathon-DataSync-Demo/main/docs/images/reload-reads-latest-state.png",
       "description_url": "https://github.com/PubNubDevelopers/Marathon-DataSync-Demo/blob/main/docs/image-descriptions.md#reload-reads-latest-state",
       "used_in": []
+    },
+    {
+      "file": "fig-strava-export.png",
+      "title": "Save the finished run as GPX or upload it to Strava",
+      "alt": "Three illustrated app screens show End run, a finished 4.98 km run with Save GPX and Connect with Strava, then a View on Strava link. The image explains the export flow; it is not evidence of a live Strava upload.",
+      "description": "A navy diagram headed After the finish, the run goes to Strava has three numbered columns connected by white arrows. End the run highlights End run on a phone showing 4.59 km, pace 6:11/km and time 28:55. Save it or send it shows a finished 4.98 km run, pace 6:53/km and time 31:41, with Save GPX and Connect with Strava highlighted. On Strava shows the same finish card with View on Strava highlighted; it is still the app screen, not a Strava activity page. Mum's km 2.0 cheer is marked heard. A footer says the full track stays on the runner's phone while DataSync keeps the simplified trail, and simulated runs can save a labeled file but never go to Strava. The illustration explains the optional configured flow, not a verified upload to a live account.",
+      "visible_text": [
+        "AN EXTRA IN THE DEMO APP",
+        "After the finish, the run goes to Strava",
+        "End the run",
+        "Save it or send it",
+        "On Strava",
+        "End run",
+        "4.98 km",
+        "6:53/km",
+        "31:41",
+        "You finished",
+        "Save GPX",
+        "Connect with Strava",
+        "View on Strava",
+        "Back to the race"
+      ],
+      "id": "fig-strava-export",
+      "width": 1600,
+      "height": 1379,
+      "sha256": "02ee56dc6a26118964136d54ead4b8ec2582a922b6ab9ca5342cca90bee4ff12",
+      "image_url": "https://raw.githubusercontent.com/PubNubDevelopers/Marathon-DataSync-Demo/main/docs/images/fig-strava-export.png",
+      "description_url": "https://github.com/PubNubDevelopers/Marathon-DataSync-Demo/blob/main/docs/image-descriptions.md#fig-strava-export",
+      "used_in": [
+        "README.md",
+        "hackernoon-how-to.md"
+      ]
     }
   ]
 }
