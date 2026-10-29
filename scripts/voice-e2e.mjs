@@ -106,7 +106,9 @@ try {
   const allowedPrompt = await context.request.get(`${BASE}/api/voice?say=start`, { headers, maxRedirects: 0 })
   const allowedPreset = await context.request.post(`${BASE}/api/voice`, { headers, data: { from: 'Alex', message: 'Go Maya, go!' }, maxRedirects: 0 })
   const customText = await context.request.post(`${BASE}/api/voice`, { headers, data: { from: 'Alex', message: 'Words nobody recorded.' }, maxRedirects: 0 })
-  step(deniedPrompt.status() === 403 && allowedPrompt.status() === 303 && allowedPrompt.headers().location === '/audio/voice/v1/start.mp3' && allowedPreset.status() === 303 && allowedPreset.headers().location === '/audio/voice/v1/cheer-go.mp3', 'The real voice endpoint verifies runner authorization and redirects known lines to their recordings')
+  // Netlify keeps the request's query string on a redirect; the recording is the path.
+  const target = (res) => new URL(res.headers().location ?? '', BASE).pathname
+  step(deniedPrompt.status() === 403 && allowedPrompt.status() === 303 && target(allowedPrompt) === '/audio/voice/v1/start.mp3' && allowedPreset.status() === 303 && target(allowedPreset) === '/audio/voice/v1/cheer-go.mp3', 'The real voice endpoint verifies runner authorization and redirects known lines to their recordings', [deniedPrompt, allowedPrompt, allowedPreset].map((res) => `${res.status()} ${res.headers().location ?? ''}`.trim()).join(' / '))
   step(customText.status() === 200 && (await customText.json()).mode === 'text-only', 'The real voice endpoint answers text-only for words without a recording')
   await runner.locator('[data-action=start]:not([disabled])').waitFor({ timeout: 20000 })
   await runner.locator('[data-action=start]').click()
