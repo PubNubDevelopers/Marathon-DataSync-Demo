@@ -185,7 +185,7 @@ try {
   if (SCREENSHOTS) await gps.locator('.card.finished').screenshot({ path: join(SCREENSHOTS, 'gps-run-gpx.png') })
   await gpsContext.close()
 } catch (e) {
-  step(false, 'unexpected error', e.message)
+  step(false, 'unexpected error', e.message.replace(/([#&]k=)[^&\s"'<>]+/g, '$1[redacted]'))
 }
 
 await browser.close()
