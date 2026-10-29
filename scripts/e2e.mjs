@@ -12,11 +12,14 @@
 // run downloads as valid GPX, survives a reload, and a simulated run stays off Strava.
 // A separate browser with mocked GPS checks the real-run export without uploading
 // anything to a real Strava account.
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { chromium } from 'playwright'
 
 const BASE = (process.argv[2] ?? 'http://localhost:3000').replace(/\/$/, '')
 const PHONE = { width: 390, height: 844 }
+const SCREENSHOTS = process.env.E2E_SCREENSHOT_DIR
+if (SCREENSHOTS) mkdirSync(SCREENSHOTS, { recursive: true })
 const results = []
 const step = (ok, name, detail = '') => {
   results.push(ok)
@@ -148,6 +151,7 @@ try {
   await runner.locator('.card.finished').waitFor({ timeout: 20000 })
   const restoredExport = await downloadGpx(runner)
   step(restoredExport.valid && restoredExport.timed && restoredExport.points === exported.points, 'The finished track survives a reload and exports again', `${restoredExport.points} points`)
+  if (SCREENSHOTS) await runner.locator('.card.finished').screenshot({ path: join(SCREENSHOTS, 'simulated-run-gpx.png') })
 
   const gpsContext = await browser.newContext({ viewport: PHONE, permissions: ['geolocation'], geolocation: { latitude: 52.2395, longitude: 21.0455, accuracy: 5 } })
   const gps = await gpsContext.newPage()
@@ -178,6 +182,7 @@ try {
   step(gpsExport.valid && gpsExport.coordinates && gpsExport.timed && gpsExport.points >= 2 && !gpsExport.name?.includes('simulated') && !gpsExport.filename.includes('-simulated'), 'A GPS run exports a timed track without a simulation label', `${gpsExport.points} points; mocked GPS`)
   step(gpsExport.points >= 4 && gpsExport.firstLatitude === 52.2395 && gpsExport.firstLongitude === 21.0455, 'A mid-run reload keeps the earlier GPS track in the final export', `${gpsExport.points} points, including the first fix`)
   step(strava.enabled ? await ok(gps.locator('[data-action=strava]').waitFor({ timeout: 10000 })) : (await gps.locator('[data-action=strava]').count()) === 0, 'The GPS Strava button matches server configuration', strava.enabled ? 'connect offered; no upload attempted' : 'GPX only')
+  if (SCREENSHOTS) await gps.locator('.card.finished').screenshot({ path: join(SCREENSHOTS, 'gps-run-gpx.png') })
   await gpsContext.close()
 } catch (e) {
   step(false, 'unexpected error', e.message)
